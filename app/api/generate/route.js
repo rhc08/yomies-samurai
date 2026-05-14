@@ -90,8 +90,27 @@ Return ONLY valid JSON, no markdown fences, no commentary. Structure:
           generationConfig: {
             temperature: 1.1,
             topP: 0.95,
-            maxOutputTokens: 1500,
+            maxOutputTokens: 2000,
             responseMimeType: 'application/json',
+            responseSchema: {
+              type: 'OBJECT',
+              properties: {
+                drinks: {
+                  type: 'ARRAY',
+                  items: {
+                    type: 'OBJECT',
+                    properties: {
+                      name: { type: 'STRING' },
+                      drinkId: { type: 'STRING' },
+                      description: { type: 'STRING' },
+                      diagnosis: { type: 'STRING' },
+                    },
+                    required: ['name', 'drinkId', 'description', 'diagnosis'],
+                  },
+                },
+              },
+              required: ['drinks'],
+            },
           },
         }),
       }
@@ -125,12 +144,27 @@ Return ONLY valid JSON, no markdown fences, no commentary. Structure:
     try {
       parsed = JSON.parse(cleaned);
     } catch (parseErr) {
-      return Response.json({
-        drinks: FALLBACK,
-        source: 'fallback',
-        error: 'bad_shape',
-        detail: `JSON parse failed. Raw text: ${cleaned.slice(0, 200)}`,
-      });
+      // Try to extract a JSON object from anywhere in the text (Gemini sometimes adds prose)
+      const match = cleaned.match(/\{[\s\S]*\}/);
+      if (match) {
+        try {
+          parsed = JSON.parse(match[0]);
+        } catch (e2) {
+          return Response.json({
+            drinks: FALLBACK,
+            source: 'fallback',
+            error: 'bad_shape',
+            detail: `JSON parse failed. Raw text: ${cleaned.slice(0, 300)}`,
+          });
+        }
+      } else {
+        return Response.json({
+          drinks: FALLBACK,
+          source: 'fallback',
+          error: 'bad_shape',
+          detail: `JSON parse failed, no object found. Raw: ${cleaned.slice(0, 300)}`,
+        });
+      }
     }
 
     if (!parsed?.drinks || !Array.isArray(parsed.drinks) || parsed.drinks.length === 0) {
