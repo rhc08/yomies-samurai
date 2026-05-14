@@ -46,7 +46,7 @@ export async function POST(req) {
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return Response.json({ drinks: FALLBACK, source: 'fallback' });
+      return Response.json({ drinks: FALLBACK, source: 'fallback', error: 'no_key', detail: 'GEMINI_API_KEY env var is not set on the server' });
     }
 
     const { dayName, timeOfDay, hour } = getTimeContext();
@@ -100,21 +100,46 @@ Return ONLY valid JSON, no markdown fences, no commentary. Structure:
     if (!response.ok) {
       const errText = await response.text();
       console.error('Gemini API error:', errText);
-      return Response.json({ drinks: FALLBACK, source: 'fallback', error: 'api_error' });
+      return Response.json({
+        drinks: FALLBACK,
+        source: 'fallback',
+        error: 'api_error',
+        detail: `status ${response.status}: ${errText.slice(0, 400)}`,
+      });
     }
 
     const data = await response.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!text) {
-      return Response.json({ drinks: FALLBACK, source: 'fallback', error: 'no_text' });
+      return Response.json({
+        drinks: FALLBACK,
+        source: 'fallback',
+        error: 'no_text',
+        detail: `response shape unexpected: ${JSON.stringify(data).slice(0, 300)}`,
+      });
     }
 
     const cleaned = text.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(cleaned);
+    let parsed;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch (parseErr) {
+      return Response.json({
+        drinks: FALLBACK,
+        source: 'fallback',
+        error: 'bad_shape',
+        detail: `JSON parse failed. Raw text: ${cleaned.slice(0, 200)}`,
+      });
+    }
 
     if (!parsed?.drinks || !Array.isArray(parsed.drinks) || parsed.drinks.length === 0) {
-      return Response.json({ drinks: FALLBACK, source: 'fallback', error: 'bad_shape' });
+      return Response.json({
+        drinks: FALLBACK,
+        source: 'fallback',
+        error: 'bad_shape',
+        detail: `Missing drinks array. Got: ${JSON.stringify(parsed).slice(0, 200)}`,
+      });
     }
 
     // Validate drinkIds exist
@@ -127,6 +152,11 @@ Return ONLY valid JSON, no markdown fences, no commentary. Structure:
     return Response.json({ drinks: validated.slice(0, 3), source: 'gemini' });
   } catch (e) {
     console.error('Generation error:', e);
-    return Response.json({ drinks: FALLBACK, source: 'fallback', error: 'exception' });
+    return Response.json({
+      drinks: FALLBACK,
+      source: 'fallback',
+      error: 'exception',
+      detail: String(e?.message || e).slice(0, 300),
+    });
   }
 }
