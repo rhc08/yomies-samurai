@@ -81,7 +81,7 @@ Return ONLY valid JSON, no markdown fences, no commentary. Structure:
 {"drinks":[{"name":"...","drinkId":"...","description":"...","diagnosis":"..."},{"name":"...","drinkId":"...","description":"...","diagnosis":"..."},{"name":"...","drinkId":"...","description":"...","diagnosis":"..."}]}`;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
