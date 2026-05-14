@@ -16,6 +16,7 @@ export default function MenuPage() {
   const [confession, setConfession] = useState('');
   const [drinks, setDrinks] = useState(null);
   const [source, setSource] = useState(null);
+  const [errorDetail, setErrorDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [loadIdx, setLoadIdx] = useState(0);
@@ -53,6 +54,7 @@ export default function MenuPage() {
         if (data?.drinks) {
           setDrinks(data.drinks);
           setSource(data.source || 'unknown');
+          setErrorDetail(data.error ? { error: data.error, detail: data.detail } : null);
           localStorage.setItem(
             'yomies_drinks',
             JSON.stringify({ confession: stored, drinks: data.drinks, source: data.source })
@@ -175,9 +177,16 @@ export default function MenuPage() {
           these names belong to you, today, only.
         </p>
         {source === 'fallback' && (
-          <p className="mt-3 text-center text-[10px] font-mono uppercase tracking-widest text-heat/70">
-            ⚠ demo mode · ai not connected · check vercel env vars
-          </p>
+          <div className="mt-3 text-center">
+            <p className="text-[10px] font-mono uppercase tracking-widest text-heat/80 mb-1">
+              ⚠ demo mode · ai didn't generate
+            </p>
+            {errorDetail && (
+              <p className="text-[9px] font-mono text-soft/70 mt-1 max-w-xs mx-auto leading-relaxed">
+                {errorDetail.error}: {errorDetail.detail?.slice(0, 120)}
+              </p>
+            )}
+          </div>
         )}
         {source === 'gemini' && (
           <p className="mt-3 text-center text-[10px] font-mono uppercase tracking-widest text-yomies/50">

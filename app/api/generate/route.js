@@ -87,6 +87,12 @@ Return ONLY valid JSON, no markdown fences, no commentary. Structure:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
+          safetySettings: [
+            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
+            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
+          ],
           generationConfig: {
             temperature: 1.1,
             topP: 0.95,
@@ -128,14 +134,41 @@ Return ONLY valid JSON, no markdown fences, no commentary. Structure:
     }
 
     const data = await response.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const candidate = data?.candidates?.[0];
+    const finishReason = candidate?.finishReason;
+    const text = candidate?.content?.parts?.[0]?.text;
 
     if (!text) {
+      // Distinguish blocked-by-safety from other empty responses
+      if (finishReason === 'SAFETY' || finishReason === 'PROHIBITED_CONTENT') {
+        return Response.json({
+          drinks: FALLBACK,
+          source: 'fallback',
+          error: 'safety_blocked',
+          detail: `Gemini blocked the response (finishReason: ${finishReason}). The confession may have triggered a safety filter. Try a different phrasing.`,
+        });
+      }
+      if (finishReason === 'RECITATION') {
+        return Response.json({
+          drinks: FALLBACK,
+          source: 'fallback',
+          error: 'recitation_blocked',
+          detail: 'Gemini blocked the response for potential recitation. Try a different confession.',
+        });
+      }
+      if (data?.promptFeedback?.blockReason) {
+        return Response.json({
+          drinks: FALLBACK,
+          source: 'fallback',
+          error: 'prompt_blocked',
+          detail: `Prompt itself was blocked: ${data.promptFeedback.blockReason}`,
+        });
+      }
       return Response.json({
         drinks: FALLBACK,
         source: 'fallback',
         error: 'no_text',
-        detail: `response shape unexpected: ${JSON.stringify(data).slice(0, 300)}`,
+        detail: `finishReason: ${finishReason || 'unknown'}. Raw: ${JSON.stringify(data).slice(0, 300)}`,
       });
     }
 
